@@ -1,0 +1,12 @@
+include LICENSE NOTICE.md README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
+include Start-ProteusMcp.ps1 mcp-config.example.toml run_server.py
+recursive-include docs *.md
+recursive-include scripts *.py
+recursive-include tests *.py
+global-exclude *.py[cod]
+prune calibration
+prune workspaces
+prune research
+prune work
+prune reports
+prune .git

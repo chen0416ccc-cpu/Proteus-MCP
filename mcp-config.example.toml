@@ -1,0 +1,11 @@
+[mcp_servers.proteus]
+command = 'D:\Projects\Proteus-MCP\.venv\Scripts\python.exe'
+args = ["-X", "utf8", 'D:\Projects\Proteus-MCP\run_server.py', "serve"]
+
+[mcp_servers.proteus.env]
+PROTEUS_MCP_WORKSPACE = 'D:\ProteusWork'
+PROTEUS_MCP_EXE = 'C:\Program Files\Labcenter Electronics\Proteus 9 Professional\Bin\PDS.exe'
+PROTEUS_MCP_LIBRARY = 'C:\ProgramData\Labcenter Electronics\Proteus 9 Professional\Library'
+PROTEUS_MCP_KEIL = 'C:\Keil_v5'
+# 新文件导出需要本机校准模板；准备方法见 docs/calibration.md。
+# PROTEUS_MCP_CALIBRATION = 'D:\ProteusLocal\10-terminal-wire.pdsprj'

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proteus-mcp"
+version = "0.1.0"
+description = "Proteus 原理图、PCB 与仿真的本地 MCP 服务"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.md"]
+authors = [{name = "chen0416ccc-cpu"}]
+keywords = ["mcp", "proteus", "eda", "8051", "pcb"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+]
+dependencies = []
+
+[project.optional-dependencies]
+bridge = ["frida==17.26.2"]
+
+[project.scripts]
+proteus-mcp = "proteus_mcp.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/chen0416ccc-cpu/Proteus-MCP"
+Documentation = "https://github.com/chen0416ccc-cpu/Proteus-MCP#readme"
+Issues = "https://github.com/chen0416ccc-cpu/Proteus-MCP/issues"
+
+[tool.setuptools.packages.find]
+include = ["proteus_mcp*"]
+
+[tool.setuptools.package-data]
+proteus_mcp = ["qt_agent.js", "live_agent.js", "pcb_agent.js", "ppc_agent.js", "simulation_agent.js", "notice_watcher.ps1"]
