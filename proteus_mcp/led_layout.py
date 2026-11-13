@@ -78,8 +78,9 @@ def plan(model):
     wire('RESET', 'C3.2', r)
     wire('RESET', 'R9.1', r)
     wire('RESET', 'U1.9', r, [-5, -6], [-5, 32], [18, 32])
-    power('C1.2', 'GND', [-36, 17])
-    power('C2.2', 'GND', [-20, 17])
+    # Keep ground captions clear of the first LED row's reference labels.
+    power('C1.2', 'GND', [-36, 19])
+    power('C2.2', 'GND', [-20, 19])
     power('C3.1', 'VCC', [2, 28])
     power('R9.2', 'GND', [18, 18])
     power('C4.1', 'VCC', [28, 20])

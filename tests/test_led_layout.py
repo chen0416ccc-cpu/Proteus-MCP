@@ -51,6 +51,13 @@ class LedLayoutTests(unittest.TestCase):
         self.model['components']['D1']['rotation'] = 180
         self.assertFalse(matches(self.model))
 
+    def test_crystal_ground_captions_have_clearance_above_first_led_row(self):
+        spec = plan(self.model)
+        for ref in ('C1', 'C2'):
+            ground = spec['terminals']['@'+ref+'_2']['at']
+            self.assertGreaterEqual(ground[1]-PLACEMENTS['R1'][1], 7)
+            self.assertLess(ground[1], PLACEMENTS[ref][1]-2)
+
 
 if __name__ == '__main__':
     unittest.main()
