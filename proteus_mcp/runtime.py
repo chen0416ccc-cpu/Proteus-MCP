@@ -40,11 +40,15 @@ def launcher_info(executable):
         data = powershell("[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
                           "$s=(New-Object -ComObject WScript.Shell).CreateShortcut(" + ps_string(shortcut) + "); "
                           "$s | Select-Object TargetPath,Arguments,WorkingDirectory | ConvertTo-Json -Compress")
-        if data.get("Arguments"):
+        target = Path(data["TargetPath"]).resolve()
+        if target != Path(executable).resolve():
+            launch, directory, source = Path(executable), Path(executable).parent, "configured_executable (unrelated shortcut ignored)"
+        elif data.get("Arguments"):
             raise CircuitError("Shortcut has arguments; configure PROTEUS_MCP_LAUNCHER explicitly")
-        launch = Path(data["TargetPath"])
-        directory = Path(data["WorkingDirectory"] or str(Path(executable).parent))
-        source = str(shortcut)
+        else:
+            launch = target
+            directory = Path(data["WorkingDirectory"] or str(Path(executable).parent))
+            source = str(shortcut)
     else:
         launch, directory, source = Path(executable), Path(executable).parent, "configured_executable"
     # An advertised MSI shortcut may report its icon resource as TargetPath.

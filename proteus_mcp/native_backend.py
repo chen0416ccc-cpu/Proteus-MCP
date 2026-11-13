@@ -2,7 +2,6 @@
 
 import copy
 import json
-import os
 import re
 import time
 import uuid
@@ -14,10 +13,6 @@ from .firmware import inspect_hex
 from .model import CircuitError, atomic_write, checked_properties, digest, json_bytes, validate
 from .native9 import Builder, GRID, PIN_ORDER, inspect_components, rewrite_project
 from .devices import native_order
-
-
-CALIBRATION = Path(os.getenv('PROTEUS_MCP_CALIBRATION') or
-                   Path(__file__).resolve().parents[1] / "calibration" / "10-terminal-wire.pdsprj")
 
 
 def read_project(path):
@@ -232,7 +227,8 @@ def set_properties(part, properties):
         props = checked_properties(part["device"], properties, part.get('native_definition',{}).get('library_path'))
     for key, value in props.items():
         if key == "value":
-            part["labels"][1]["text"] = value
+            from .native9 import component_value
+            component_value(part, value)
             if part["device"] != "CRYSTAL":
                 continue
             if any(c in value for c in "{}\r\n"):
@@ -277,11 +273,20 @@ def new_export_folder(store, project):
     return folder
 
 
-def native_create(store, project):
+def template_for(store, calibration):
+    if calibration is not None:
+        return Path(calibration)
+    from .initialization import NativeInitialization
+    from .discovery import discover
+    from .library import default_library
+    return NativeInitialization(store.root, discover(library=default_library())).ensure()
+
+
+def native_create(store, project, calibration=None):
     store.read(project)
     with store.lock(project):
         output = new_export_folder(store, project) / "empty.pdsprj"
-        result = rewrite_project(CALIBRATION, output, lambda objects: [], reset_database=True)
+        result = rewrite_project(template_for(store, calibration), output, lambda objects: [], reset_database=True)
     return {**result, "components": 0, "sha256": digest(output.read_bytes()),
             "backend": "experimental_native_file_writer"}
 
@@ -357,11 +362,11 @@ def draw_led_chaser(objects, model, firmware):
     return b.objects
 
 
-def native_export_led_chaser(store, project):
-    return native_export(store, project, routing='schematic', _led_only=True)
+def native_export_led_chaser(store, project, calibration=None):
+    return native_export(store, project, routing='schematic', _led_only=True, calibration=calibration)
 
 
-def native_export(store, project, layout="auto", routing="auto", placements=None, sheet_size=None, wire_plan=None, _led_only=False):
+def native_export(store, project, layout="auto", routing="auto", placements=None, sheet_size=None, wire_plan=None, _led_only=False, calibration=None):
     """Export the calibrated device subset and arbitrary validated topology."""
     from .routing import route_model
     if sheet_size is not None:
@@ -425,7 +430,7 @@ def native_export(store, project, layout="auto", routing="auto", placements=None
             return routed
 
         output = target/(project+".pdsprj")
-        result = rewrite_project(CALIBRATION, output, transform, database_mode="generate", sheet_size=final_size)
+        result = rewrite_project(template_for(store, calibration), output, transform, database_mode="generate", sheet_size=final_size)
         readback = native_read(output)
         if {frozenset(pins) for pins in readback["stored_connectivity"].values()} != {frozenset(pins) for pins in model["nets"].values()}:
             raise CircuitError("Native stored connectivity differs from model")

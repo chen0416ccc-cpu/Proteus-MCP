@@ -2,31 +2,37 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
 
 from .server import Server
 from .service import Service
+from .model import CircuitError
 
 
 def run():
-    parser = argparse.ArgumentParser(description="Local Proteus semantic MCP; no assumed COM backend")
-    parser.add_argument("--workspace", default=os.getenv("PROTEUS_MCP_WORKSPACE", str(Path(__file__).resolve().parents[1] / "workspaces")))
-    parser.add_argument("--keil", default=os.getenv("PROTEUS_MCP_KEIL", "D:/KEIL5"))
-    parser.add_argument("--proteus", default=os.getenv("PROTEUS_MCP_EXE"))
-    parser.add_argument("--library", default=os.getenv("PROTEUS_MCP_LIBRARY", "D:/ProgramData/Labcenter Electronics/Proteus 9 Professional/Library"))
+    from .discovery import default_workspace
+    parser = argparse.ArgumentParser(description="Local Proteus MCP interface")
+    parser.add_argument("--workspace", default=str(default_workspace()))
+    parser.add_argument("--keil")
+    parser.add_argument("--proteus")
+    parser.add_argument("--library")
+    parser.add_argument("--calibration")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("serve")
     commands.add_parser("doctor")
+    setup = commands.add_parser('setup', help='Prepare local native writer resources without manual placement')
+    setup.add_argument('--verify-native', action='store_true', help='Also open, save and reopen the workspace template')
     call = commands.add_parser("call")
     call.add_argument("tool")
     call.add_argument("arguments", nargs="?", default="{}")
     args = parser.parse_args()
-    service = Service(args.workspace, args.keil, args.proteus, args.library)
+    service = Service(args.workspace, args.keil, args.proteus, args.library, args.calibration)
     if args.command == "serve":
         Server(service).serve()
         return 0
     if args.command == "doctor":
         value = service.doctor()
+    elif args.command == 'setup':
+        value = service.call('native_initialize', {'verify_native': args.verify_native})
     else:
         from .server import TOOLS, check_schema
         definition = next((tool for tool in TOOLS if tool["name"] == args.tool), None)
@@ -41,7 +47,11 @@ def run():
 
 def main():
     try:
-        return run()
+        try:
+            return run()
+        except (OSError, CircuitError) as error:
+            print(json.dumps({'status': 'error', 'reason': str(error)}, ensure_ascii=True, indent=2))
+            return 1
     finally:
         from .bridge import shutdown_bridge
         shutdown_bridge()

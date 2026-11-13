@@ -4,7 +4,7 @@ import copy
 import struct
 
 from .model import CircuitError
-from .native9 import EMPTY_CDB, Reader
+from .native9 import EMPTY_CDB, PIN_ORDER, Reader
 
 
 def read_string(reader, size=2):
@@ -102,7 +102,8 @@ def mirror_database(data, objects, generate=False):
                     'package':spec['defaults'].get('PACKAGE',''), 'header':'00'*20,
                     'value':spec['defaults'].get('VALUE',obj['device']), 'properties':spec['properties']}
                 instances[obj['ref']] = {'header':'00'*16,'ref':obj['ref'],
-                    'pins':[(p['name'],p['number']) for p in spec['pins']], 'tail':'00'*12}
+                    'pins':[(p['name'],p.get('native_number',p['number']) if obj['device'] in PIN_ORDER
+                             else p['number']) for p in spec['pins']], 'tail':'00'*12}
             part = copy.deepcopy(templates[obj["device"]])
             instance = copy.deepcopy(instances[part["ref"]])
             identity = obj["identity"]

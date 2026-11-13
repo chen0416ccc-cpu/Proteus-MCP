@@ -125,6 +125,12 @@ class UpgradeDialogTests(unittest.TestCase):
             modal = {'class':'Appln::MessageBox','title':'Proteus 9 Professional','standard_buttons':0x400400,
                      'informative_text':'','text':"文件将以 9.0\0 版本格式保存。\n此格式无法被旧版 Proteus 加载。\n\n先前版本将另存为 'pcb-test [Proteus 8.13].pdsprj'。"}
             self.assertTrue(upgrade_confirmation_allowed(modal,path,folder))
+            native9 = copy.deepcopy(modal)
+            native9['text'] = native9['text'].replace('[Proteus 8.13]', '[Proteus 9.0]')
+            self.assertTrue(upgrade_confirmation_allowed(native9,path,folder))
+            unknown = copy.deepcopy(native9)
+            unknown['text'] = unknown['text'].replace('[Proteus 9.0]', '[Proteus 9.1]')
+            self.assertFalse(upgrade_confirmation_allowed(unknown,path,folder))
             self.assertFalse(upgrade_confirmation_allowed(modal,Path(folder).parent/'pcb-test.pdsprj',folder))
             for key,value in (('text',modal['text']+'额外问题'),('standard_buttons',0x400),('class','QMessageBox'),('informative_text','Unknown question')):
                 changed = copy.deepcopy(modal); changed[key] = value

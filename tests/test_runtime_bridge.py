@@ -6,12 +6,28 @@ from unittest.mock import MagicMock, patch
 
 from proteus_mcp.bridge import Bridge, simulation_state
 from proteus_mcp.model import CircuitError, atomic_write, json_bytes
-from proteus_mcp.runtime import Runtime, diagnostic_events
+from proteus_mcp.runtime import Runtime, diagnostic_events, launcher_info
 from proteus_mcp.server import check_schema, TOOLS
 from proteus_mcp.verification import assess_sequence
 
 
 class RuntimeBridgeTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'Windows launcher discovery')
+    def test_desktop_shortcut_cannot_override_the_selected_installation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'Desktop').mkdir()
+            (root/'Desktop/Proteus.lnk').write_bytes(b'fixture')
+            selected, other = root/'selected/PDS.exe', root/'other/PDS.exe'
+            selected.parent.mkdir()
+            selected.write_bytes(b'MZselected')
+            with patch.dict(os.environ, {'PUBLIC': str(root)}, clear=True), patch(
+                    'proteus_mcp.runtime.powershell', return_value={
+                        'TargetPath': str(other), 'Arguments': 'unrelated arguments', 'WorkingDirectory': str(other.parent)}):
+                result = launcher_info(selected)
+            self.assertEqual(str(selected), result['executable'])
+            self.assertIn('unrelated shortcut ignored', result['source'])
+
     def test_session_path_and_reused_pid_are_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             runtime = Runtime(folder, "PDS.exe")

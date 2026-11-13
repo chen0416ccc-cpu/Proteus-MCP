@@ -24,6 +24,10 @@
 | `model.py` / `catalog.py` | 修订、批量模型编辑、基础验证 |
 | `library.py` / `devices.py` | 库索引、真实定义、来源哈希和分服务目录作用域 |
 | `native9.py` / `database.py` / `native_backend.py` | 校准文件记录、DSN/CDB 一致性与新文件写入 |
+| `discovery.py` | 安装、库与工具链发现，参数/环境优先级和用户可写默认工作区 |
+| `native_seed.py` / `initialization.py` | 安装资源裁剪、原创记录构造、私有缓存及输入指纹失效 |
+| `initialization_verify.py` | 显式原生保存重开、真实引脚与折点核对，不使用屏幕 |
+| `build_profiles.py` | 按能力匹配模块指纹及对应适配代码，未知构建拒绝调用 |
 | `auto_layout.py` / `symbol_geometry.py` | 网络驱动的布局候选、器件主体和标注占用 |
 | `schematic.py` / `orderly.py` / `drawing_quality.py` | 半格连线树、显式通道和共享绘图检查 |
 | `runtime.py` / `bridge.py` / `*_agent.js` | 进程归属、版本校验、原生调用和回读 |

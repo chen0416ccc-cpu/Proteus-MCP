@@ -1,6 +1,6 @@
 # 工具参考
 
-共 53 个工具。以下列出用途和关键参数，完整 JSON Schema 以 MCP 的 `tools/list` 返回为准。不能把“能发现命令”理解为“已验证执行该命令”。
+共 54 个工具。以下列出用途和关键参数，完整 JSON Schema 以 MCP 的 `tools/list` 返回为准。不能把“能发现命令”理解为“已验证执行该命令”。
 
 ## 版本与结果
 
@@ -16,6 +16,7 @@
 | 工具 | 用途与参数 |
 | --- | --- |
 | `proteus_doctor` | 依赖、路径、模块哈希、逐项能力和当前源码的本机验收记录。无参数。 |
+| `native_initialize` | 自动准备工作区私有基线；可选 `verify_native=true` 执行原生保存重开和引脚/导线回读。不会运行基线仿真或控制屏幕。 |
 | `runtime_status` | 进程、窗口和菜单元数据，可传 `session`。不截屏、不模拟输入。 |
 | `runtime_diagnostics` | `session` 的崩溃事件、转储路径和采集错误，保存诊断文件。 |
 | `native_status` | 自有 `session` 的原生命令、弹窗、日志及仿真状态。 |
@@ -63,7 +64,7 @@
 | `native_inspect` | 读取 `path` 的 ZIP 成员与哈希，不做电气认证。 |
 | `native_read` | 读取已支持的 `.pdsprj`：器件、属性、引脚连接、真实导线几何和 DSN/CDB 一致性。 |
 | `native_preview` | 根据实际文件几何重建 SVG；`path` 必填，可指定新的 `output`。仍不是原生窗口截图。 |
-| `native_create` | 在已有语义 `project` 下生成新的实验性空工程，需模板并单独保存重开。 |
+| `native_create` | 在已有语义 `project` 下生成新的实验性空工程，首次使用自动初始化；输出需单独保存重开检查。 |
 | `native_set_component` | `path`、新 `output`、`ref`、`properties`、`expected_sha256`，同步修改支持的 DSN/CDB 字段。 |
 | `native_export_led_chaser` | 严格检查八灯例拓扑，调用带完整信号线和边界检查的新文件导出。 |
 | `native_export` | 从 `project` 导出新文件。支持 `layout`、`routing`、`placements`、`sheet_size` 和显式 `wire_plan`，不覆盖原件。 |

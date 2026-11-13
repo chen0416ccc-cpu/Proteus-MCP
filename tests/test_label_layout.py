@@ -8,7 +8,8 @@ from proteus_mcp.label_layout import (apply_label, apply_component_labels, text_
                                      wire_label_mismatches, terminal_label_mismatches)
 from proteus_mcp.model import CircuitError, Store
 from proteus_mcp.native9 import GRID, Reader, pack_text
-from proteus_mcp.native_backend import CALIBRATION, read_project, native_export, native_read
+from proteus_mcp.native_backend import read_project, native_export, native_read
+from tests.local_fixtures import CALIBRATION
 from proteus_mcp.preview import native_preview
 
 

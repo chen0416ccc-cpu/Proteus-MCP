@@ -133,8 +133,8 @@ def parse_device(blob, name, allow_unresolved_pins=False):
         pos += 16
         symbol, pos = _cstring(blob, pos)
         label, pos = _cstring(blob, pos)
-        number, pos = _cstring(blob, pos)
-        number = number or label
+        native_number, pos = _cstring(blob, pos)
+        number = native_number or label
         hidden = not bool(flags[1] & 2)
         lengths = {'$PINSHORT':254000, '$PINDEFAULT':508000, '$PININVERT':508000,
                    '$PINPOSCLK':508000, '$PINNEGCLK':508000}
@@ -142,7 +142,7 @@ def parse_device(blob, name, allow_unresolved_pins=False):
             raise CircuitError('Unsupported pin symbol '+symbol)
         pin_length = lengths.get(symbol)
         delta = transform_xy([-pin_length, 0], angle, mirror) if pin_length is not None else None
-        pins.append({'number': number, 'name': label, 'anchor': [x,y],
+        pins.append({'number': number, 'native_number': native_number, 'name': label, 'anchor': [x,y],
                      'xy': None if hidden or delta is None else [x+delta[0], y+delta[1]],
                      'direction': transform_xy([-1,0], angle, mirror) if delta is not None else None,
                      'geometry_source': 'calibrated_pin_glyph' if delta is not None else 'requires_native_instance',
@@ -182,11 +182,14 @@ def parse_device(blob, name, allow_unresolved_pins=False):
 
 def definition(device, library_path=None, allow_unresolved_pins=False):
     from .library import default_library
-    return _definition(device, library_path, allow_unresolved_pins, str(default_library()))
+    root = default_library()
+    files = [Path(library_path)] if library_path is not None else sorted(root.glob('*.LIB'))
+    signature = tuple((str(p.resolve()), p.stat().st_mtime_ns, p.stat().st_size) for p in files if p.is_file())
+    return _definition(device, library_path, allow_unresolved_pins, str(root), signature)
 
 
 @lru_cache(maxsize=512)
-def _definition(device, library_path, allow_unresolved_pins, library_root):
+def _definition(device, library_path, allow_unresolved_pins, library_root, signature=()):
     index = LibraryIndex(library_root)
     results = index.search(device, 200)['results']
     matches = [r for r in results if r['device'] == device and

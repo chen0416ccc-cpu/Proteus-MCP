@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from proteus_mcp.devices import definition, _definition
-from proteus_mcp.library import DEFAULT_LIBRARY, LibraryIndex, default_library, library_scope
+from proteus_mcp.library import LibraryIndex, default_library, library_scope
 from proteus_mcp.service import Service
 from test_extensions import device_blob
 from test_library import library_fixture
@@ -65,20 +65,20 @@ class PublicConfigurationTests(unittest.TestCase):
                     service.call('example_external_interrupt', {'project': 'Example'})
             resolve.assert_called_once_with('BUZZER', str(service.library.root / 'ACTIVE.LIB'))
 
-    def test_calibration_environment_works_before_package_import(self):
+    def test_calibration_environment_is_captured_by_service_not_package_import(self):
         with tempfile.TemporaryDirectory() as folder:
             template = str(Path(folder) / 'local.pdsprj')
             environment = dict(os.environ, PROTEUS_MCP_CALIBRATION=template)
             result = subprocess.run(
-                [sys.executable, '-c', 'import json; from proteus_mcp.native_backend import CALIBRATION; print(json.dumps(str(CALIBRATION)))'],
+                [sys.executable, '-c', 'import json,sys; from proteus_mcp.service import Service; '
+                 'print(json.dumps(str(Service(sys.argv[1]).initialization.override)))', str(Path(folder)/'work')],
                 env=environment, capture_output=True, text=True, check=True)
             self.assertEqual(template, json.loads(result.stdout))
 
     def test_doctor_does_not_advertise_export_without_a_local_template(self):
         with tempfile.TemporaryDirectory() as folder:
-            service = Service(Path(folder) / 'work')
-            with patch('proteus_mcp.service.CALIBRATION', Path(folder) / 'missing.pdsprj'):
-                report = service.doctor()
+            service = Service(Path(folder) / 'work', calibration=Path(folder) / 'missing.pdsprj')
+            report = service.doctor()
             self.assertFalse(report['capabilities']['native_file_generation']['available'])
             self.assertFalse(report['capabilities']['native_schematic_write']['available'])
 

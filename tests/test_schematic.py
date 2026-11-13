@@ -5,7 +5,8 @@ from zipfile import ZipFile
 
 from proteus_mcp.model import CircuitError, Store
 from proteus_mcp.native9 import GRID, inspect_components, resize_sheet, sheet_dimensions
-from proteus_mcp.native_backend import CALIBRATION, native_export, native_read, read_project
+from proteus_mcp.native_backend import native_export, native_read, read_project
+from tests.local_fixtures import CALIBRATION
 from proteus_mcp.schematic import HORIZONTAL, VERTICAL, audit_crossings, crossing_allowed, search, STEP
 
 

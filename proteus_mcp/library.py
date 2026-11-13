@@ -9,13 +9,16 @@ from pathlib import Path
 from .model import CircuitError
 
 
-DEFAULT_LIBRARY = Path("D:/ProgramData/Labcenter Electronics/Proteus 9 Professional/Library")
 _LIBRARY_ROOT = ContextVar('proteus_library_root', default=None)
 INDEX_START, RECORD_SIZE = 1352, 276
 
 
 def default_library():
-    return Path(_LIBRARY_ROOT.get() or os.getenv('PROTEUS_MCP_LIBRARY') or DEFAULT_LIBRARY).resolve()
+    value = _LIBRARY_ROOT.get() or os.getenv('PROTEUS_MCP_LIBRARY')
+    if value is None:
+        from .discovery import discover
+        value = discover()['library']
+    return Path(value).resolve()
 
 
 @contextmanager

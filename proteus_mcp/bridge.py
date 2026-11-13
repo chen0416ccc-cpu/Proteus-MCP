@@ -11,27 +11,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .model import CircuitError, atomic_write, digest, json_bytes
+from .build_profiles import ADAPTER_SOURCES, select_profile
 
 BASE = Path(__file__).resolve().parents[1]
 FRIDA_USED = False
-PROFILE = {
-    "Qt5Gui.dll": "5e7d2d41b8b92a880e83b8cc0ca173f5da61218604186196787ee1600956be1e",
-    "AppFrame.dll": "318cc4602d6a6fec23066261632dadd5f0094664e71e839c725397a898b718a2",
-    "PDS.exe": "86c0c9b2e69d6cb06d1b5c3730910c5d8d715a8b01fa5fd285798c11b0c83fbf",
-    "Qt5Core.dll": "8d2ff4ce9096ddccc4f4cd62c2e41fc854cfd1b0d6e8d296645a7f5fd4ae565a",
-    "Qt5Widgets.dll": "3788c669d4b645e5a576de9fc77fca776bf516d43c89143dc2ca28291ba14358",
-    "DSIM.dll": "239892aa14c96fa4a4fd3f8baa055a79eed599409acf54485dc7668de7b84dfb",
-}
-LIVE_PROFILE = {
-    'ISIS.dll':'7c9b902732e8a43cb6176e05bc8649b1611df2012d34b0ad49132fadbe6e08f6',
-    'AppFrame.dll':'318cc4602d6a6fec23066261632dadd5f0094664e71e839c725397a898b718a2',
-    'LxlCore.dll':'cbc121209ad413f8f4ac016203351159482b739f053bc02c770be844c3dd5251',
-    'Prims.dll':'1d1cc0fab42042cbd8cf592524a3ee594fc4261fd44a540f842795755a094ee9',
-}
-PCB_PROFILE = {**LIVE_PROFILE, 'ARES.dll':'dc4fa4aac6b5a41dbe46d4d72f48ad1ea2921e9ce1ce74cec1283dcd855058d6'}
-SIMULATION_PROFILE = {**LIVE_PROFILE,
-    'VSMDEBUG.dll':'bace6a1f7b2ee37de57cc2cad10ca8b513534521007092fd57a7c58d8b654f70',
-    'PROSPICE.dll':'a5e98b3e522cbb924c39cc4c92becb2f0f7dc93eb966ba568affcb1855290123'}
 LABELS = {"run": ["\u8fd0\u884c", "Run"], "pause": ["\u6682\u505c", "Pause"],
           "stop": ["\u505c\u6b62", "Stop"], "save": ["&\u4fdd\u5b58\u5de5\u7a0b", "&Save Project"],
           "simulation_log": ["\u67e5\u770b\u4eff\u771f\u65e5\u5fd7", "Simulation Log"]}
@@ -48,7 +31,7 @@ def frida_module():
         try:
             return importlib.import_module("frida")
         except ModuleNotFoundError as error:
-            raise CircuitError("OPTIONAL_BRIDGE_DEPENDENCY_MISSING: install frida in research/deps") from error
+            raise CircuitError("OPTIONAL_BRIDGE_DEPENDENCY_MISSING: install the package [bridge] extra in this Python environment") from error
 
 
 def isolate_standard_handles():
@@ -63,13 +46,7 @@ def isolate_standard_handles():
 
 
 def profile_check(folder, live=False, pcb=False, simulation=False):
-    expected = PROFILE | (PCB_PROFILE if pcb else LIVE_PROFILE if live else {})
-    if simulation:
-        expected |= SIMULATION_PROFILE
-    actual = {name: digest((Path(folder)/name).read_bytes()) for name in expected}
-    if actual != expected:
-        raise CircuitError("NATIVE_BUILD_NOT_CALIBRATED: executable or Qt DLL hash changed")
-    return actual
+    return select_profile(folder, live=live, pcb=pcb, simulation=simulation)[1]
 
 
 def simulation_state(snapshot):
@@ -97,7 +74,7 @@ def upgrade_confirmation_allowed(modal, path, workspace):
         return False
     body = modal.get('text', '').replace('\0', '').replace('\r\n', '\n')
     pattern = (r"文件将以 9\.0\s+版本格式保存。\n此格式无法被旧版 Proteus 加载。\n\n"
-               + r"先前版本将另存为 '" + re.escape(path.stem) + r" \[Proteus 8\.\d+\]\.pdsprj'。")
+               + r"先前版本将另存为 '" + re.escape(path.stem) + r" \[Proteus (?:8\.\d+|9\.0)\]\.pdsprj'。")
     return re.fullmatch(pattern, body) is not None
 
 
@@ -118,7 +95,7 @@ class Bridge:
         if len(state["processes"]) != 1:
             raise CircuitError("Tracked Proteus process is not alive or is ambiguous")
         process = state["processes"][0]
-        profile_check(Path(process["ExecutablePath"]).parent, live=live, pcb=pcb, simulation=simulation)
+        profile, _ = select_profile(Path(process["ExecutablePath"]).parent, live=live, pcb=pcb, simulation=simulation)
         from .runtime import project_windows
         candidates = project_windows(process,self.runtime.load(session))
         if len(candidates) != 1:
@@ -129,14 +106,15 @@ class Bridge:
         FRIDA_USED = True
         attached = frida.attach(process["ProcessId"])
         try:
-            source = (BASE/'proteus_mcp/qt_agent.js').read_text(encoding='utf-8')
+            resources = ADAPTER_SOURCES[profile['adapter']]
+            files = list(resources['qt'])
             if live:
-                source += '\n'+(BASE/'proteus_mcp/live_agent.js').read_text(encoding='utf-8')
+                files.extend(resources['live'])
             if pcb:
-                source += '\n'+(BASE/'proteus_mcp/pcb_agent.js').read_text(encoding='utf-8')
-                source += '\n'+(BASE/'proteus_mcp/ppc_agent.js').read_text(encoding='utf-8')
+                files.extend(resources['pcb'])
             if simulation:
-                source += '\n'+(BASE/'proteus_mcp/simulation_agent.js').read_text(encoding='utf-8')
+                files.extend(resources['simulation'])
+            source = '\n'.join((BASE/'proteus_mcp'/name).read_text(encoding='utf-8') for name in files)
             script = attached.create_script(source)
             script.load()
             yield script.exports_sync, str(candidates[0]["hwnd"])
@@ -196,7 +174,8 @@ class Bridge:
         with self.attach(session, live=pending_live) as (api, hwnd):
             before = api.snapshot(hwnd)
             cancellations = []
-            if action == 'save' and before['modal']:
+            continuing_save = action == 'save' and upgrade_confirmation_allowed(before['modal'], path, self.runtime.root.parent)
+            if action == 'save' and before['modal'] and not continuing_save:
                 # Only the calibrated save-on-close prompt is cancellable.
                 # Cancel preserves edits; the explicit save below is still verified.
                 cancellations.append(api.cancelcloseforsave(hwnd,before['modal']))
@@ -207,7 +186,8 @@ class Bridge:
             if action == 'stop' or (action == 'run' and before_state == 'stopped'):
                 atomic_write(epoch_path, json_bytes({'epoch':uuid.uuid4().hex,'state':'unconfirmed',
                                                      'action':action,'session':session}))
-            response = api.command(hwnd, LABELS[action], "Appln::Action" if action == "simulation_log" else "")
+            response = ({'dispatched':True, 'continued_prior_save':True} if continuing_save else
+                        api.command(hwnd, LABELS[action], "Appln::Action" if action == "simulation_log" else ""))
             deadline = time.monotonic()+12
             confirmations = []
             previous_file, stable = None, 0

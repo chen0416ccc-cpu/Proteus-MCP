@@ -5,7 +5,7 @@
 
 面向 AI Agent 的 Proteus 通用操作接口，目标是逐步开放 Proteus 的各项能力，让 Agent 能够直接使用 Proteus 完成电子设计工作。
 
-> 项目处于实验阶段。原生功能仅适配[指定的 Proteus 9 构建](docs/limitations.md#兼容范围)；导出新原生工程需要准备[本机校准模板](docs/calibration.md)。
+> 项目处于实验阶段。[兼容范围](docs/limitations.md#兼容范围) · [本机初始化](docs/calibration.md) · [已知限制](docs/limitations.md)
 
 [安装](#安装) · [客户端配置](#客户端配置) · [使用示例](#使用示例) · [工具参考](docs/tools.md) · [问题反馈](https://github.com/chen0416ccc-cpu/Proteus-MCP/issues)
 
@@ -39,6 +39,15 @@ py -3 -m venv .venv
 
 仅使用器件库查询和语义模型时，可将安装命令中的 `".[bridge]"` 改为 `.`。Release wheel 安装方法见[安装文档](docs/installation.md#从-release-安装)。
 
+安装后可先检查环境并准备本机资源：
+
+```powershell
+.\.venv\Scripts\python.exe -m proteus_mcp doctor
+.\.venv\Scripts\python.exe -m proteus_mcp setup
+```
+
+Proteus、器件库和 Keil 路径通常自动识别。首次导出会自动完成本机初始化，无需手工放置校准器件；需要安装中带有可识别的 Proteus 9 样例资源。初始化不下载或分发商业库。详见[安装文档](docs/installation.md)。
+
 ## 客户端配置
 
 以 Codex 的 `config.toml` 为例，将路径改为本机安装位置：
@@ -50,15 +59,13 @@ args = ["-X", "utf8", "-m", "proteus_mcp", "serve"]
 
 [mcp_servers.proteus.env]
 PROTEUS_MCP_WORKSPACE = 'D:\ProteusWork'
-PROTEUS_MCP_EXE = 'C:\Program Files\Labcenter Electronics\Proteus 9 Professional\Bin\PDS.exe'
-PROTEUS_MCP_LIBRARY = 'C:\ProgramData\Labcenter Electronics\Proteus 9 Professional\Library'
-# 编译 C51 程序时配置：
+# 自动发现不符合预期时再配置：
+# PROTEUS_MCP_EXE = 'C:\Program Files\Labcenter Electronics\Proteus 9 Professional\Bin\PDS.exe'
+# PROTEUS_MCP_LIBRARY = 'C:\ProgramData\Labcenter Electronics\Proteus 9 Professional\Library'
 # PROTEUS_MCP_KEIL = 'C:\Keil_v5'
-# 导出新原生工程时配置：
-# PROTEUS_MCP_CALIBRATION = 'D:\ProteusLocal\template.pdsprj'
 ```
 
-准备好校准模板后，取消对应配置行的注释并填写文件路径。配置完成后启动 MCP 服务，调用 `proteus_doctor` 检查依赖和兼容性。
+启动 MCP 服务后，调用 `proteus_doctor` 查看实际选中的安装、初始化状态和各项原生能力的兼容性。多套 Proteus 共存或使用便携安装时，可显式指定路径。
 
 Claude Desktop 等 stdio 客户端的 JSON 配置见[客户端配置](docs/installation.md#其他客户端)。
 
@@ -96,7 +103,7 @@ Claude Desktop 等 stdio 客户端的 JSON 配置见[客户端配置](docs/insta
 | 文档 | 内容 |
 | --- | --- |
 | [安装与配置](docs/installation.md) | 环境变量、客户端配置和常见问题 |
-| [校准模板](docs/calibration.md) | 新建原生工程所需的本机模板 |
+| [本机初始化](docs/calibration.md) | 自动准备、原生校验与高级覆盖 |
 | [工具参考](docs/tools.md) | 参数、返回值和会话操作 |
 | [布局与布线](docs/drawing.md) | 自动布局、固定位置、纸张与连线检查 |
 | [兼容性与限制](docs/limitations.md) | 支持的构建、器件、PCB 和仿真范围 |

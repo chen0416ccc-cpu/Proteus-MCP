@@ -455,6 +455,18 @@ def pin_xy(part, number):
     return part_transform(part, [dx*GRID, dy*GRID])
 
 
+def component_value(part, value):
+    import re
+    part['labels'][1]['text'] = value
+    # Some library definitions store VALUE as well as the visible value label.
+    # Proteus prefers that assignment when loading, so both must agree.
+    text = part['labels'][3]['text']
+    pattern = r'(?m)^\{?VALUE=[^{}\r\n]*\}?$'
+    if re.search(pattern, text) and any(c in str(value) for c in '{}\r\n'):
+        raise CircuitError('Native value property contains a reserved character')
+    part['labels'][3]['text'] = re.sub(pattern, lambda _: '{VALUE='+str(value)+'}', text)
+
+
 class Builder:
     """Small calibrated device subset. Every pin owns at most one wire object."""
     def __init__(self, templates):
@@ -489,7 +501,7 @@ class Builder:
             part['native_definition'] = copy.deepcopy(native_definition)
         part['transform'] = orientation(rotation, mirror)
         if value is not None:
-            part["labels"][1]["text"] = value
+            component_value(part, value)
         for key, value in (properties or {}).items():
             import re
             text = part["labels"][3]["text"]

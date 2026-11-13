@@ -5,7 +5,8 @@ from pathlib import Path
 
 from proteus_mcp.database import read_database, pack_database
 from proteus_mcp.model import CircuitError, digest
-from proteus_mcp.native_backend import CALIBRATION, native_set_component, native_read
+from proteus_mcp.native_backend import native_set_component, native_read
+from tests.local_fixtures import CALIBRATION
 
 
 class NativeDatabaseTests(unittest.TestCase):

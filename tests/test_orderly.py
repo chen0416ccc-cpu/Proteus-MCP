@@ -5,7 +5,8 @@ from pathlib import Path
 
 from proteus_mcp.model import CircuitError, Store
 from proteus_mcp.native9 import Builder, GRID, schedule_wires, pin_xy
-from proteus_mcp.native_backend import CALIBRATION, read_project, native_export
+from proteus_mcp.native_backend import read_project, native_export
+from tests.local_fixtures import CALIBRATION
 from proteus_mcp.orderly import grid_point, dense
 
 

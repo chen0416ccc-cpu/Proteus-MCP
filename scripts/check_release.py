@@ -98,8 +98,8 @@ def audit_sources():
         text = (ROOT / 'docs/tools.md').read_text(encoding='utf-8')
         documented = set(re.findall(r'^\| `([a-z][a-z0-9_]+)` \|', text, re.M))
         actual = {tool['name'] for tool in TOOLS}
-        if actual != documented or len(actual) != 53:
-            errors.append('Tool documentation does not match the 53 registered tools.')
+        if actual != documented or len(actual) != 54:
+            errors.append('Tool documentation does not match the 54 registered tools.')
         if not {'proteus_mcp/' + name for name in RESOURCES} <= set(names):
             errors.append('One or more runtime bridge resources are not tracked.')
     return names, errors

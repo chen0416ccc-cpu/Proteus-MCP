@@ -4,7 +4,8 @@ from pathlib import Path
 
 from proteus_mcp.examples import led_chaser
 from proteus_mcp.model import CircuitError, Store, atomic_write, digest, json_bytes
-from proteus_mcp.native_backend import CALIBRATION, native_create, native_export_led_chaser, native_read, native_set_component
+from proteus_mcp.native_backend import native_create, native_export_led_chaser, native_read, native_set_component
+from tests.local_fixtures import CALIBRATION
 from proteus_mcp.firmware import inspect_hex
 
 

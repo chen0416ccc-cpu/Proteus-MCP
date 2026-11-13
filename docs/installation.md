@@ -25,25 +25,29 @@ py -3 -m venv .venv
 
 ```powershell
 py -3 -m venv D:\Projects\ProteusEnv
-D:\Projects\ProteusEnv\Scripts\python.exe -m pip install '.\proteus_mcp-0.1.0-py3-none-any.whl[bridge]'
+D:\Projects\ProteusEnv\Scripts\python.exe -m pip install '.\proteus_mcp-0.2.0-py3-none-any.whl[bridge]'
 ```
 
-wheel 不带仓库的 `scripts/`、测试和详细文档。需要准备模板校验脚本、参与开发或运行测试时，使用源码仓库或 sdist。未向 PyPI 发布，不要直接安装未经核对的同名包。
+wheel 包含自动发现和初始化功能，不带仓库的 `scripts/`、测试和详细文档。参与开发或运行测试时，使用源码仓库或 sdist。未向 PyPI 发布，不要直接安装未经核对的同名包。
 
 ## 路径配置
 
-所有路径请明确填写，不依赖为开发环境保留的 D 盘默认值。
+程序优先使用命令行参数，其次为环境变量，再读取注册表安装记录、卸载记录、标准目录和 PATH。不会扫描整个磁盘，也不使用维护者的 D 盘路径。显式路径无效时直接报错，不静默换到别的安装。
+
+多套安装共存时默认选择发现的较新版本，并关联它的 ProgramData/Library；可用 `--proteus` 固定一套，必要时再覆盖库。Keil 也通过安装记录、PATH 或标准目录发现。`doctor.installation` 列出实际路径、来源及候选安装。
 
 | 环境变量 | 内容 |
 | --- | --- |
-| `PROTEUS_MCP_WORKSPACE` | 可写工作区；输出、会话记录、备份、日志和采样都在这里 |
-| `PROTEUS_MCP_EXE` | Proteus 安装目录中的 `Bin\PDS.exe`，不是 `.lnk` |
-| `PROTEUS_MCP_LIBRARY` | 实际 `.LIB` 所在目录，不是 `MODELS` 目录 |
-| `PROTEUS_MCP_KEIL` | 包含 `C51\BIN` 的 Keil 根目录 |
-| `PROTEUS_MCP_CALIBRATION` | 本机私有校准工程的绝对路径；仅新建/导出原生文件需要 |
+| `PROTEUS_MCP_WORKSPACE` | 可写工作区；输出、会话记录、缓存、日志和采样都在这里 |
+| `PROTEUS_MCP_EXE` | 可选覆盖：安装目录中的 `Bin\PDS.exe`，不是 `.lnk` |
+| `PROTEUS_MCP_LIBRARY` | 可选覆盖：实际 `.LIB` 所在目录，不是 `MODELS` 目录 |
+| `PROTEUS_MCP_KEIL` | 可选覆盖：包含 `C51\BIN` 的 Keil 根目录 |
+| `PROTEUS_MCP_CALIBRATION` | 高级选项：只读私有基线覆盖；正常自动初始化不需要 |
 | `PROTEUS_MCP_LAUNCHER` | 可选，覆盖自动选择的启动程序；仅在默认启动方式不适用时使用 |
 
-除启动器和校准模板外，命令行也可传 `--workspace`、`--proteus`、`--library`、`--keil`。这些全局选项必须写在 `serve` / `doctor` / `call` 之前。
+不配置工作区时，Windows 默认使用 `%LOCALAPPDATA%\Proteus-MCP\workspaces`；其他平台使用 `$XDG_DATA_HOME/proteus-mcp/workspaces` 或 `~/.local/share/proteus-mcp/workspaces`。不会写入 site-packages。
+
+命令行可传 `--workspace`、`--proteus`、`--library`、`--keil`、`--calibration`。这些全局选项必须写在 `serve` / `doctor` / `setup` / `call` 之前。
 
 ```powershell
 $env:PROTEUS_MCP_EXE = 'C:\Program Files\Labcenter Electronics\Proteus 9 Professional\Bin\PDS.exe'
@@ -53,7 +57,23 @@ $env:PROTEUS_MCP_WORKSPACE = 'D:\ProteusWork'
 .\.venv\Scripts\python.exe -X utf8 -m proteus_mcp doctor
 ```
 
-从源码启动也可以用 `Start-ProteusMcp.ps1 -Doctor`；脚本优先使用仓库的 `.venv`，不修改全局 Python 或客户端配置。`Start-ProteusMcp.ps1` 的 `-Workspace` 参数优先于环境变量，省略时默认使用仓库的 `workspaces/`。
+从源码启动也可以用 `Start-ProteusMcp.ps1 -Doctor`；脚本优先使用仓库的 `.venv`，不修改全局 Python 或客户端配置。`-Workspace` 优先于环境变量，省略时沿用程序默认值。
+
+## 首次初始化
+
+```powershell
+python -m proteus_mcp --workspace D:\ProteusWork setup
+```
+
+初始化从本机可识别的 Proteus 9 样例容器和库定义构造私有基线，不需要手工放六种器件。首次原生导出也会自动执行。安装中需包含可识别的 Samples；格式条件、缓存及高级覆盖见[本机初始化](calibration.md)。
+
+显式验证原生加载、保存和重开：
+
+```powershell
+python -m proteus_mcp --workspace D:\ProteusWork setup --verify-native
+```
+
+也可用 `Start-ProteusMcp.ps1 -Setup` 或 `-Setup -VerifyNative`。只做离线初始化不启动软件；原生验证只操作新生成的工作区文件，不使用截图或鼠标键盘。
 
 ## Codex
 
@@ -70,27 +90,24 @@ $env:PROTEUS_MCP_WORKSPACE = 'D:\ProteusWork'
       "command": "D:\\Projects\\Proteus-MCP\\.venv\\Scripts\\python.exe",
       "args": ["-X", "utf8", "-m", "proteus_mcp", "serve"],
       "env": {
-        "PROTEUS_MCP_WORKSPACE": "D:\\ProteusWork",
-        "PROTEUS_MCP_EXE": "C:\\Program Files\\Labcenter Electronics\\Proteus 9 Professional\\Bin\\PDS.exe",
-        "PROTEUS_MCP_LIBRARY": "C:\\ProgramData\\Labcenter Electronics\\Proteus 9 Professional\\Library",
-        "PROTEUS_MCP_KEIL": "C:\\Keil_v5"
+        "PROTEUS_MCP_WORKSPACE": "D:\\ProteusWork"
       }
     }
   }
 }
 ```
 
-准备好[模板](calibration.md)后，把 `PROTEUS_MCP_CALIBRATION` 添加到 `env`。重启客户端中的 MCP 服务，再调用 `proteus_doctor`。此配置结构不代表每一种客户端都已经实测。
+一般不需要配置模板路径。自动发现不符合预期时，在 `env` 中补充路径覆盖，重启 MCP 服务后调用 `proteus_doctor`。此配置结构不代表每一种客户端都已经实测。
 
 ## 常见问题
 
 **能列出工具，但运行不了原生操作。** 工具列表是静态接口，不是后端可用性证明。检查 `doctor.capabilities` 中对应条目的 `available` 和 `reason`。
 
-**`NATIVE_BUILD_NOT_CALIBRATED`。** 安装文件和已校准构建不一致。不要改哈希来跳过；需要为该构建重新定位、校准和验收适配器。
+**`NATIVE_BUILD_NOT_CALIBRATED`。** 查看 `doctor.native_build`：每项能力分别列出匹配配置、缺少的模块和实际/预期哈希。不要改哈希跳过；新构建需要独立适配。文件格式读取、自动初始化和原生桥适配分开判定。
 
-**缺少校准工程。** GitHub 包刻意不携带商业资源。按[模板准备](calibration.md)完成本机设置，或只使用不依赖模板的功能。
+**`BOOTSTRAP_SOURCE_NOT_FOUND`。** 安装缺少可识别的 Proteus 9 样例。补装 Samples 后重试 `setup`；不要从未知来源下载所谓通用模板。
 
-**提示可选桥依赖缺失。** 在客户端使用的那个 Python 环境安装 `.[bridge]` 或 Release wheel 的 `[bridge]` 扩展。旧版诊断中的 `research/deps` 是本地回退提示，不是公开安装步骤。
+**提示可选桥依赖缺失。** 在客户端使用的那个 Python 环境安装 `.[bridge]` 或 Release wheel 的 `[bridge]` 扩展。
 
 **工程启动被阻止。** 保存并退出外来 Proteus 进程，或者使用 MCP 返回的自有 `session`。不要删除会话记录或强杀进程来规避保护。
 

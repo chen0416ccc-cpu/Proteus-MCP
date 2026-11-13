@@ -7,6 +7,9 @@ from .model import digest,json_bytes
 
 
 COVERAGE = [
+    {'area':'local_initialization','implemented':True,'tools':['proteus_doctor','native_initialize'],
+     'scope':'Read-only installation discovery; locally generated writer resources from a recognized installed container and library definitions; explicit native save/reopen/pin/wire verification',
+     'not_supported':['download_vendor_assets','automatic_unknown_ABI_adaptation','native_visual_verification']},
     {'area':'project_lifecycle','implemented':True,
      'tools':['project_create','native_create','project_open','project_save','project_reopen','project_close'],
      'scope':'New native files and owned session open/save/reopen/normal close; explicit save verification',

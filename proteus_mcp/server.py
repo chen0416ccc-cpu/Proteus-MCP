@@ -28,6 +28,8 @@ def tool(name, description, properties=None, required=(), read_only=False):
 
 TOOLS = [
     tool("proteus_doctor", "Report capability-specific health. Installed is not verified working.", read_only=True),
+    tool('native_initialize', 'Prepare per-workspace native writer records automatically from installed Proteus 9 resources. No manual six-device project. verify_native explicitly opens/saves/reopens the owned template; never simulates or controls the screen. Explicit calibration overrides are read-only.',
+         {'verify_native': {'type': 'boolean'}}),
     tool("catalog_list", "List supported logical devices and pins; library_path explicitly selects ambiguous installed devices. NOT placement verification.", {"device": STR, 'library_path':STR}, read_only=True),
     tool("library_search", "Search the actual installed Proteus .LIB device index without mouse or screenshots. Finding a device does not imply native placement support.",
          {"query": STR, "limit": {"type": "integer", "minimum": 1}}, ["query"], True),
