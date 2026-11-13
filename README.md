@@ -116,3 +116,5 @@ python scripts/check_release.py
 代码采用 [MIT](LICENSE) 许可证。Proteus、Keil 及其商业资源需另行获取，不包含在本仓库中。
 
 Proteus MCP 为非官方项目，与 Labcenter Electronics、Arm/Keil 无隶属关系。第三方说明见 [NOTICE.md](NOTICE.md)。
+
+<p align="center">感谢 <a href="https://linux.do/">LinuxDo 社区</a> 的讨论与反馈。</p>
