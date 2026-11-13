@@ -73,7 +73,8 @@ class PublicConfigurationTests(unittest.TestCase):
                 [sys.executable, '-c', 'import json,sys; from proteus_mcp.service import Service; '
                  'print(json.dumps(str(Service(sys.argv[1]).initialization.override)))', str(Path(folder)/'work')],
                 env=environment, capture_output=True, text=True, check=True)
-            self.assertEqual(template, json.loads(result.stdout))
+            # Windows runners may expose the temporary directory via an 8.3 alias.
+            self.assertEqual(Path(template).resolve(), Path(json.loads(result.stdout)).resolve())
 
     def test_doctor_does_not_advertise_export_without_a_local_template(self):
         with tempfile.TemporaryDirectory() as folder:
