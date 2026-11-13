@@ -3,13 +3,13 @@
 [![CI](https://github.com/chen0416ccc-cpu/Proteus-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/chen0416ccc-cpu/Proteus-MCP/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-用于 Proteus 的 MCP 服务，提供器件库查询、原理图编辑、PCB 布线和仿真控制工具。通过本地 stdio 接入支持 MCP 的 AI 客户端。
+面向 AI Agent 的 Proteus 通用操作接口，目标是逐步开放 Proteus 的各项能力，让 Agent 能够直接使用 Proteus 完成电子设计工作。
 
 > 项目处于实验阶段。原生功能仅适配[指定的 Proteus 9 构建](docs/limitations.md#兼容范围)；导出新原生工程需要准备[本机校准模板](docs/calibration.md)。
 
 [安装](#安装) · [客户端配置](#客户端配置) · [使用示例](#使用示例) · [工具参考](docs/tools.md) · [问题反馈](https://github.com/chen0416ccc-cpu/Proteus-MCP/issues)
 
-## 功能
+## 当前支持
 
 | 功能 | 支持内容 |
 | --- | --- |

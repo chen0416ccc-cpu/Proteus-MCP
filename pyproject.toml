@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "proteus-mcp"
 version = "0.1.0"
-description = "Proteus 原理图、PCB 与仿真的本地 MCP 服务"
+description = "面向 AI Agent 的 Proteus 通用 MCP 接口"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
