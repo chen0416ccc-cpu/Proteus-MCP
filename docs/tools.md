@@ -50,7 +50,7 @@
 
 | 工具 | 用途与参数 |
 | --- | --- |
-| `example_led_chaser` | 新建 `project`，12 MHz/12T AT89C51、P1 低有效八灯、复位/晶振和 C51 源码，默认采用固定平行通道布局。 |
+| `example_led_chaser` | 新建 `project`，12 MHz/12T AT89C51、P1 低有效八灯、复位/晶振和 C51 源码。示例模型保留预设位置；自动原生导出与其他电路使用同一布局算法。 |
 | `example_external_interrupt` | 新建 `project`，`mode=level` 或 `nesting`，可设 `initial_count=0..9999` 做边界测试，返回布局计划。 |
 | `source_write` | 写 `main.c`。已有源码须传匹配的 `expected_sha256`，旧版备份。 |
 | `firmware_build` | 实际调用 C51 / BL51 / OH51，保留日志并检验 HEX。不代表仿真通过。 |
@@ -69,7 +69,9 @@
 | `native_export` | 从 `project` 导出新文件。支持 `layout`、`routing`、`placements`、`sheet_size` 和显式 `wire_plan`，不覆盖原件。 |
 | `native_apply` | 使用默认布局/布线导出新文件的便捷入口，不是当前会话原位写入。默认完整信号线，禁止静默退回标签短线。 |
 
-`routing=auto` 和 `schematic` 使用完整连续信号线，流水灯采用固定平行通道。`routing=labels` 必须显式选择，表示用户确实需要网络标签式连接；`wires` 是旧版整格正交路由。所有公开导出都检查纸张边界。无法布线、碰到器件或越界时应报错，不将失败降级为看起来没有连线的散图。
+`layout=auto` 按网络图、引脚方向和器件/全文标注尺寸生成三个候选方案，比较线长、折点、交叉和占用面积。`routing=auto` 和 `schematic` 使用完整连续信号线，不走示例专用坐标。`routing=labels` 必须显式选择；`wires` 是旧版整格正交路由。所有模式和显式 `wire_plan` 共用质量检查，并从最终文件再次核对。
+
+未指定 `sheet_size` 时，自动布局可扩大实际纸张；指定尺寸后不擅自放大。`layout=model` 不移动模型坐标，`placements` 中的锚定器件也不会被搬走。不满足检查就报错，不降级成标签散图。返回的 `routing.quality`、`routing.file_readback_quality` 和 `routing.layout_attempts` 用于检查与诊断，字段和边界见[布局与布线](drawing.md)。
 
 `placements` 为原生整数格坐标，`wire_plan` 中折点和文字锚点为精确半格坐标。语义 `position` 与原生坐标的 Y 方向不同，见[架构](architecture.md)。文字宽高范围 0.4..4 格，旋转为 0/90/180/270 度，隐藏文字不移除网络身份。
 
@@ -92,6 +94,8 @@
 | `live_history` | `action=undo` / `redo`，只操作同一文档已记录的 MCP 批次；外部修改、部分失败和历史分歧使其失效。 |
 
 实时坐标使用 `position_nm`，不是语义 `position`。连接操作为 `{op:connect, from_ref, from_pin, to_ref, to_pin}`；删除器件时必须明确是否删除直连线。单支路用 `delete_wire` 的精确地址，DOT 用 `delete_junction` 并列出全部入射导线地址。不提供推测整个网络范围的删除。
+
+对已观测的接线器件，变换前按原生端点更新方式做预检。会留下斜线或零长段的移动返回 `LIVE_TRANSFORM_REQUIRES_REROUTE`，没有实现的实时重布线不会被说成成功。实时回执的 `geometry_verified` 只覆盖引脚/导线链接、端点和正交线段，`layout_quality_verified` 仍为 `false`，不等同于离线导出的整图检查。
 
 ## PCB 与规则
 

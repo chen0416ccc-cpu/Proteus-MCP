@@ -85,7 +85,7 @@ def connectivity(parsed, pin_orders=None, hidden_pins=None):
     return {name: sorted(pins) for name, pins in merged.items()}
 
 
-def label_nets(objects, model):
+def label_nets(objects, model, visible=True):
     """Give each signal tree its semantic name in a native wire LABEL record."""
     wires = {obj["key"]: obj for obj in objects if obj["type"] == "wire"}
     parents = {key: key for key in wires}
@@ -123,6 +123,9 @@ def label_nets(objects, model):
                 a, b = wire['points'][:2]
             label = copy.deepcopy(style)
             label.update(text=name, xy=[(a[0]+b[0])//2-len(name)*GRID//4, (a[1]+b[1])//2-GRID])
+            if not visible:
+                from .label_layout import apply_label
+                apply_label(label, {'visible': False})
             wire["labels"] = [label]
     return objects
 
@@ -372,10 +375,6 @@ def native_export(store, project, layout="auto", routing="auto", placements=None
                 raise CircuitError('This experimental native layout requires the example_led_chaser device set')
             if {name: sorted(pins) for name,pins in model['nets'].items()} != {name: sorted(pins) for name,pins in nets.items()}:
                 raise CircuitError('This experimental native layout requires the example_led_chaser topology')
-        if sheet_size is None and placements is None and layout == 'auto' and routing in ('auto', 'schematic') and wire_plan is None:
-            from .led_layout import matches, SHEET_SIZE
-            if matches(model):
-                sheet_size = list(SHEET_SIZE)
         for part in model['components'].values():
             if part['device'] not in PIN_ORDER:
                 provenance = part.get('native_definition')
@@ -399,30 +398,47 @@ def native_export(store, project, layout="auto", routing="auto", placements=None
             atomic_write(firmware, source_hex.read_bytes())
             atomic_write(target/"main.c", (folder/"main.c").read_bytes())
         routing_report = {}
+        final_size = list(sheet_size or [100, 70])
 
         def transform(objects):
             if wire_plan is not None:
                 from .orderly import route_plan
                 routed,details=route_plan(objects,model,firmware,placements,layout,sheet_size,wire_plan)
+                from .drawing_quality import labels, require_drawing_quality
+                locked = set()
+                for key, label, owner in labels(routed):
+                    if owner['type'] == 'component':
+                        spec = wire_plan.get('component_labels', {}).get(owner['ref'], {}).get('ref' if key[1] == 0 else 'value', {})
+                    elif owner['type'] == 'wire':
+                        spec = wire_plan.get('labels', {}).get(label['text'], {})
+                    else:
+                        spec = next((t.get('label', {}) for t in wire_plan.get('terminals', {}).values()
+                                     if [v*GRID for v in t['at']] == [owner['origin'][0], owner['origin'][1]+(GRID if t['net'] == 'GND' else -GRID)]), {})
+                    if isinstance(spec, list) or 'at' in spec:
+                        locked.add(key)
+                details['quality'] = require_drawing_quality(routed, model, final_size, locked=locked)
+                details['sheet'] = details['quality']['sheet']
             else:
                 routed, details = route_model(objects, model, firmware, placements, layout, routing, sheet_size)
             routing_report.update(details)
-            if wire_plan is None and details.get('algorithm') != 'explicit_ordered_channel_plan':
-                routed = label_nets(routed, model)
-            from .schematic import bounds_report
-            audit = bounds_report(routed, sheet_size or [100, 70])
-            if not audit['all_geometry_inside_frame']:
-                raise CircuitError('SCHEMATIC_LABEL_OUTSIDE_SHEET: '+str(audit))
-            routing_report['sheet'] = audit
+            final_size[:] = details['sheet']['sheet_size_grid']
             return routed
 
         output = target/(project+".pdsprj")
-        result = rewrite_project(CALIBRATION, output, transform, database_mode="generate", sheet_size=sheet_size)
+        result = rewrite_project(CALIBRATION, output, transform, database_mode="generate", sheet_size=final_size)
         readback = native_read(output)
         if {frozenset(pins) for pins in readback["stored_connectivity"].values()} != {frozenset(pins) for pins in model["nets"].values()}:
             raise CircuitError("Native stored connectivity differs from model")
         if not readback["database_consistent"]:
             raise CircuitError("Generated CDB does not match DSN")
+        if readback['sheet_size_grid'] != final_size:
+            raise CircuitError('NATIVE_SHEET_SIZE_MISMATCH')
+        from .drawing_quality import require_drawing_quality
+        parsed = read_project(output)[1]
+        for part in parsed['components']:
+            part['native_definition'] = model['components'][part['ref']].get('native_definition')
+        routing_report['file_readback_quality'] = require_drawing_quality(
+            parsed['objects'], model, final_size, continuous=routing != 'labels' or wire_plan is not None, reflow=False)
         manifest = {**result, "backend": "calibrated_native_file_writer", "revision": model["revision"],
                     "circuit_sha256": digest(json_bytes(model)), "sha256": readback["sha256"],
                     "components": len(readback["components"]), "stored_nets": len(readback["stored_connectivity"]),

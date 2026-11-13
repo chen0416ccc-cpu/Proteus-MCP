@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 FIXTURE_MODULES = {
-    'test_database', 'test_label_layout', 'test_native_backend', 'test_routing',
+    'test_database', 'test_label_layout', 'test_native_backend', 'test_routing', 'test_general_native',
 }
 PORTABLE_METHODS = {
     'test_native9': {'test_truncated_data', 'test_reference_junction_record'},

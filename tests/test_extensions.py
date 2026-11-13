@@ -67,6 +67,8 @@ class LiveExtensionTests(unittest.TestCase):
             'wires':[{'address':'w1','endpoints':[{'owner':'p1'},{'owner':'node1'}]}]}
 
     def test_transform_defaults_preserve_other_fields(self):
+        self.state['components'][0]['pins'][0]['wire'] = '0x0'
+        self.state['wires'] = []
         operations = prepare_operations(self.state,[{'op':'transform','ref':'R1','rotation':90}],None)
         self.assertEqual([0,0],operations[0]['position_nm'])
         self.assertEqual(0,operations[0]['mirror'])

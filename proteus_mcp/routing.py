@@ -118,24 +118,9 @@ def escape(part, pin):
     return tuple(transform_xy(direction,angle,mirror))
 
 
-def auto_positions(model):
-    from .led_layout import PLACEMENTS, matches
-    if matches(model):
-        return {ref: list(point) for ref, point in PLACEMENTS.items()}
-    refs = sorted(model["components"], key=natural)
-    leds = [r for r in refs if model["components"][r]["device"] == "LED-RED"]
-    mcu = [r for r in refs if model["components"][r]["device"] == "AT89C51"]
-    result = {ref: [24+index*36, 35] for index, ref in enumerate(mcu)}
-    for index, ref in enumerate(leds):
-        result[ref] = [-6, 15-index*12]
-        series = sorted({pin.split(".")[0] for net in model["nets"].values() if ref+".1" in net
-                         for pin in net if model["components"][pin.split(".")[0]]["device"] == "RES"}, key=natural)
-        for offset, resistor in enumerate(series):
-            result.setdefault(resistor, [-22-12*offset, 17-index*12])
-    remaining = [r for r in refs if r not in result]
-    for index, ref in enumerate(remaining):
-        result[ref] = [-20+(index % 4)*14, -max(len(leds)*12, 8)-12-(index//4)*12]
-    return result
+def auto_positions(model, templates=None, fixed=None):
+    from .auto_layout import auto_positions as topology_positions
+    return topology_positions(model, templates, fixed)
 
 
 def place_components(templates, model, firmware=None, placements=None, layout="auto"):
@@ -144,7 +129,10 @@ def place_components(templates, model, firmware=None, placements=None, layout="a
         raise CircuitError("layout must be auto or model")
     if len(model["components"]) > 100:
         raise CircuitError("Native router is limited to 100 calibrated components")
-    positions = auto_positions(model) if layout == "auto" else {
+    if placements and isinstance(placements, dict) and placements.keys() == model['components'].keys():
+        positions = dict(placements)
+    else:
+        positions = auto_positions(model, templates, placements) if layout == "auto" else {
         ref: [round(item["position"][0]/10), -round(item["position"][1]/10)] for ref, item in model["components"].items()}
     if placements:
         if not isinstance(placements, dict) or placements.keys()-positions.keys():
@@ -309,15 +297,55 @@ def route_labels(templates, model, firmware=None, placements=None, layout="auto"
 
 
 def route_model(templates, model, firmware=None, placements=None, layout="auto", routing="auto", sheet_size=None):
+    from .native9 import checked_sheet_size
+    from .native_backend import label_nets
+    from .drawing_quality import require_drawing_quality
     if routing not in ("auto", "wires", "labels", "schematic"):
         raise CircuitError("routing must be auto, wires, labels or schematic")
-    if routing in ("auto", "schematic"):
-        from .led_layout import PLACEMENTS, SHEET_SIZE, matches, plan
-        if layout == 'auto' and placements is None and matches(model):
-            from .orderly import route_plan
-            return route_plan(templates, model, firmware, PLACEMENTS, layout, sheet_size or SHEET_SIZE, plan(model))
-        from .schematic import route_schematic
-        return route_schematic(templates, model, firmware, placements, layout, sheet_size)
-    if routing == "labels":
-        return route_labels(templates, model, firmware, placements, layout)
-    return route_wires(templates, model, firmware, placements, layout)
+    if layout not in ('auto', 'model'):
+        raise CircuitError('layout must be auto or model')
+    if sheet_size is not None:
+        sheet_size = checked_sheet_size(sheet_size)
+
+    def finish(objects, details, size):
+        if details['algorithm'] != 'explicit_ordered_channel_plan':
+            label_nets(objects, model, visible=routing == 'labels')
+        quality = require_drawing_quality(objects, model, size, continuous=routing != 'labels')
+        details.update(quality=quality, sheet=quality['sheet'])
+        return objects, details
+
+    if layout == 'auto':
+        from .auto_layout import layout_candidates
+        candidates = layout_candidates(model, templates, sheet_size, placements)
+    else:
+        candidates = [{'placements': placements, 'sheet_size': sheet_size or [100, 70], 'variant': 'explicit'}]
+    attempts, successful = [], []
+    for candidate in candidates:
+        if 'error' in candidate:
+            attempts.append(candidate)
+            continue
+        size, proposed = candidate['sheet_size'], candidate['placements']
+        try:
+            if routing in ('auto', 'schematic'):
+                from .schematic import route_schematic
+                objects, details = route_schematic(templates, model, firmware, proposed, layout, size)
+            elif routing == 'labels':
+                objects, details = route_labels(templates, model, firmware, proposed, layout)
+            else:
+                objects, details = route_wires(templates, model, firmware, proposed, layout)
+            objects, details = finish(objects, details, size)
+            metrics = details['quality']['metrics']
+            score = metrics['wire_length_grid']+2*metrics['bends']+12*metrics['crossings']+.001*size[0]*size[1]
+            attempts.append({'variant': candidate['variant'], 'passed': True, 'score': round(score, 3)})
+            details['auto_layout'] = {key: value for key, value in candidate.items() if key != 'placements'}
+            successful.append((score, objects, details))
+        except CircuitError as error:
+            if layout != 'auto':
+                raise
+            attempts.append({'variant': candidate['variant'], 'passed': False, 'reason': str(error)})
+    if not successful:
+        import json
+        raise CircuitError('AUTO_SCHEMATIC_FAILED: '+json.dumps(attempts, ensure_ascii=True))
+    _, objects, details = min(successful, key=lambda item: item[0])
+    details['layout_attempts'] = attempts
+    return objects, details

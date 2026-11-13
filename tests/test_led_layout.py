@@ -8,6 +8,7 @@ from proteus_mcp.model import CircuitError, Store
 from proteus_mcp.orderly import dense, grid_point
 from proteus_mcp.routing import auto_positions, route_model
 from proteus_mcp.schematic import audit_crossings
+from tests.drawing_fixtures import chain, templates
 
 
 class LedLayoutTests(unittest.TestCase):
@@ -17,9 +18,10 @@ class LedLayoutTests(unittest.TestCase):
         self.store = Store(temporary.name)
         self.model = led_chaser(self.store, 'demo')
 
-    def test_semantic_and_native_layout_share_compact_positions(self):
+    def test_example_positions_remain_available_without_driving_general_auto_layout(self):
         self.assertTrue(matches(self.model))
-        self.assertEqual(PLACEMENTS, auto_positions(self.model))
+        with patch('proteus_mcp.led_layout.plan', side_effect=AssertionError('example plan must not drive auto layout')):
+            self.assertEqual(self.model['components'].keys(), auto_positions(self.model).keys())
         for ref, component in self.model['components'].items():
             x, y = PLACEMENTS[ref]
             self.assertEqual([10*x, -10*y], component['position'])
@@ -40,11 +42,11 @@ class LedLayoutTests(unittest.TestCase):
                             for wire in spec['wires'] for p in wire['points']))
 
     def test_default_does_not_fall_back_to_named_net_stubs(self):
-        other = {'components': {}, 'nets': {}}
+        other = chain(2)
         with patch('proteus_mcp.schematic.route_schematic', side_effect=CircuitError('NO_SCHEMATIC_ROUTE')):
             with patch('proteus_mcp.routing.route_labels') as labels:
                 with self.assertRaisesRegex(CircuitError, 'NO_SCHEMATIC_ROUTE'):
-                    route_model([], other)
+                    route_model(templates(), other)
                 labels.assert_not_called()
 
     def test_explicit_orientation_change_is_not_overridden_by_profile(self):

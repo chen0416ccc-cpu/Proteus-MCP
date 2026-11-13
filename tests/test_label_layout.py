@@ -179,7 +179,7 @@ class LabelLayoutTests(unittest.TestCase):
                 {'op': 'connect', 'name': 'HIDDEN_NET', 'pins': ['R1.2', 'R2.1']},
                 {'op': 'connect', 'name': 'VCC', 'pins': ['R1.1', 'R2.2']}])
             plan = {'terminals': {'@a': {'net': 'VCC', 'at': [-4, 0],
-                                        'label': {'at': [-6, 4], 'height': 1, 'width': .6, 'rotation': 270}},
+                                        'label': {'at': [-7, 5], 'height': 1, 'width': .6, 'rotation': 270}},
                                   '@b': {'net': 'VCC', 'at': [20, 0], 'label': {'visible': False}}},
                     'wires': [
                         {'net': 'HIDDEN_NET', 'ends': ['R1.2', 'R2.1'], 'points': [[3, 0], [13, 0]]},
@@ -198,10 +198,14 @@ class LabelLayoutTests(unittest.TestCase):
             svg = Path(preview['path']).read_text(encoding='utf-8')
             self.assertNotIn('>HIDDEN_NET</text>', svg)
             self.assertEqual(1, svg.count('>VCC</text>'))
-            self.assertIn('x="-72.0" y="-48.0" class="net"', svg)
-            self.assertIn('rotate(-270.0 -72.0 -48.0)', svg)
+            self.assertIn('x="-84.0" y="-60.0" class="net"', svg)
+            self.assertIn('rotate(-270.0 -84.0 -60.0)', svg)
             self.assertIn('rotate(-90.0 ', svg)
             self.assertIn('font-size:12.0px', svg)
+            bad = copy.deepcopy(plan)
+            bad['terminals']['@a']['label']['at'] = [-6, 4]
+            with self.assertRaisesRegex(CircuitError, 'LABEL_SPACE_EXHAUSTED'):
+                native_export(store, 'labels', layout='model', routing='schematic', wire_plan=bad)
 
 
 if __name__ == '__main__':

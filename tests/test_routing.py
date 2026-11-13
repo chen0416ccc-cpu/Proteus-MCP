@@ -56,7 +56,9 @@ class NativeRoutingTests(unittest.TestCase):
         objects, routing = route_model(inspect_components(data)["objects"], model)
         generated = inspect_components(relocate_dsn(data, objects))
         from proteus_mcp.native_backend import connectivity
-        self.assertEqual("explicit_ordered_channel_plan", routing["algorithm"])
+        self.assertEqual("half_grid_orthogonal_schematic_tree", routing["algorithm"])
+        self.assertEqual('topology_port_footprint_candidates', routing['auto_layout']['algorithm'])
+        self.assertTrue(routing['quality']['passed'])
         self.assertNotIn("fallback_reason", routing)
         self.assertTrue(routing['sheet']['all_geometry_inside_frame'])
         self.assertEqual('continuous_wires_and_explicit_junctions', routing['signal_connections'])
@@ -78,11 +80,12 @@ class NativeRoutingTests(unittest.TestCase):
             'hex':inspect_hex(firmware), 'source_sha256':digest((folder/'main.c').read_bytes())}))
         result = native_export(self.store, 'led')
         parsed = read_project(result['path'])[1]
-        self.assertEqual([100,80], native_read(result['path'])['sheet_size_grid'])
+        self.assertEqual(result['routing']['sheet']['sheet_size_grid'], native_read(result['path'])['sheet_size_grid'])
+        self.assertTrue(result['routing']['file_readback_quality']['passed'])
         self.assertTrue(result['routing']['sheet']['all_geometry_inside_frame'])
         self.assertFalse(any(text_style(label)['visible'] for wire in parsed['wires'] for label in wire['labels']))
 
     def test_explicit_label_mode_also_rejects_sheet_overflow(self):
         self.resistor_tree()
         with self.assertRaisesRegex(CircuitError, 'OUTSIDE_SHEET'):
-            native_export(self.store, 'test', routing='labels', placements={'R11':[80,0]})
+            native_export(self.store, 'test', routing='labels', placements={'R11':[80,0]}, sheet_size=[100,70])

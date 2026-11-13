@@ -29,13 +29,12 @@ def body_box(part):
     if part['device'] in known:
         box = known[part['device']]
     else:
-        anchors = [p['anchor'] for p in selected_definition(part)['pins'] if not p['hidden']]
-        if not anchors:
-            raise CircuitError('SCHEMATIC_BODY_NOT_CALIBRATED: '+part['device'])
-        box = (min(p[0] for p in anchors)/GRID, min(p[1] for p in anchors)/GRID,
-               max(p[0] for p in anchors)/GRID, max(p[1] for p in anchors)/GRID)
-        if box[0] == box[2] or box[1] == box[3]:
-            raise CircuitError('SCHEMATIC_BODY_NOT_CALIBRATED: '+part['device'])
+        from .symbol_geometry import graphic_bounds
+        try:
+            bounds = graphic_bounds(selected_definition(part)['blob'])
+        except CircuitError as error:
+            raise CircuitError('SCHEMATIC_BODY_NOT_CALIBRATED: '+part['device']+'; '+str(error)) from error
+        box = tuple(value/GRID for value in bounds)
     corners = [part_transform(part, [round(x*GRID), round(y*GRID)])
                for x in (box[0], box[2]) for y in (box[1], box[3])]
     return (min(p[0] for p in corners), min(p[1] for p in corners),
@@ -144,19 +143,25 @@ def arrange_labels(part):
         label['transform'] = '000000000400'
 
 
-def bounds_report(objects, sheet_size):
+def bounds_report(objects, sheet_size, include_text=True):
+    from .drawing_quality import label_box, labels
+    from .native9 import pin_xy
     points = []
     for obj in objects:
         if obj['type'] == 'component':
             x1, y1, x2, y2 = body_box(obj)
             points.extend([(x1, y1), (x2, y2)])
-            points.extend(label['xy'] for label in obj['labels'][:2])
+            points.extend(point for number in native_order(obj['device'], obj.get('native_definition'))
+                          if (point := pin_xy(obj, number)) is not None)
         elif obj['type'] == 'wire':
             points.extend(obj['points'])
-            points.extend(label['xy'] for label in obj['labels'])
         elif 'origin' in obj:
             x, y = obj['origin']
             points.extend([(x-GRID, y-GRID), (x+GRID, y+GRID)])
+    for _, label, _ in labels(objects) if include_text else ():
+        box = label_box(label)
+        if box:
+            points.extend([(box[0], box[1]), (box[2], box[3])])
     frame = [-sheet_size[0]*GRID//2, -sheet_size[1]*GRID//2,
               sheet_size[0]*GRID//2, sheet_size[1]*GRID//2]
     outside = [p for p in points if not (frame[0] <= p[0] <= frame[2] and frame[1] <= p[1] <= frame[3])]
@@ -164,8 +169,9 @@ def bounds_report(objects, sheet_size):
                max(p[0] for p in points), max(p[1] for p in points)] if points else [0]*4)
     return {'sheet_size_grid': list(sheet_size), 'frame_grid': [v/GRID for v in frame],
             'content_bounds_grid': [v/GRID for v in extent], 'outside_geometry_or_label_anchors': len(outside),
+            'outside_geometry_or_text_bounds': len(outside),
             'all_geometry_inside_frame': not outside,
-            'scope': 'native bodies, wires, terminal extents and text anchors; not font raster extents'}
+            'scope': 'native bodies, pins, wires, terminal extents and estimated full text bounds; not native font raster extents'}
 
 
 def route_schematic(templates, model, firmware=None, placements=None, layout='auto', sheet_size=None):
@@ -324,8 +330,6 @@ def route_schematic(templates, model, firmware=None, placements=None, layout='au
         reports.append({'net': name, 'pins': endpoints, 'wire_branches': branches, 'junctions': len(junctions),
                         'grid_length': sum(map(len, graph.values()))/4})
     audit = bounds_report(b.objects, sheet_size)
-    if not audit['all_geometry_inside_frame']:
-        raise CircuitError('SCHEMATIC_OUTSIDE_SHEET: '+str(audit))
     checked_crossings = audit_crossings(net_paths)
     if checked_crossings != len(crossing_points):
         raise CircuitError('SCHEMATIC_CROSSING_AUDIT_MISMATCH')

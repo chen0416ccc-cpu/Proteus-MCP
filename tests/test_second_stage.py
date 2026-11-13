@@ -70,6 +70,8 @@ class HistoryTests(unittest.TestCase):
         state['wires'][0]['endpoints'][0]['xy']=[2,3]
         self.assertEqual('LIVE_WIRE_POLYLINE_ENDPOINT_MISMATCH',geometry_issues(state)[0]['error'])
         state['wires'][0]['points'][0]=[2,3]
+        self.assertEqual('LIVE_NONORTHOGONAL_OR_ZERO_SEGMENT',geometry_issues(state)[0]['error'])
+        state['wires'][0]['points'].insert(1,[2,0])
         self.assertFalse(geometry_issues(state))
         state['wires'][0]['endpoints'][0]['owner']='wrong'
         self.assertEqual('LIVE_PIN_WIRE_LINK_MISMATCH',geometry_issues(state)[0]['error'])

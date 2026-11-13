@@ -28,6 +28,8 @@ def geometry_issues(state):
         points, endpoints = wire['points'], wire['endpoints']
         if len(points)<2 or len(endpoints)!=2 or points[0]!=endpoints[0]['xy'] or points[-1]!=endpoints[-1]['xy']:
             issues.append({'wire':address,'error':'LIVE_WIRE_POLYLINE_ENDPOINT_MISMATCH'})
+        if any(a == b or a[0] != b[0] and a[1] != b[1] for a, b in zip(points, points[1:])):
+            issues.append({'wire':address,'error':'LIVE_NONORTHOGONAL_OR_ZERO_SEGMENT'})
     for part in state['components']:
         for pin in part['pins']:
             if pin['wire']=='0x0':
@@ -36,6 +38,50 @@ def geometry_issues(state):
             if not wire or not any(e['owner']==part['address'] and e['xy']==pin['xy'] for e in wire['endpoints']):
                 issues.append({'ref':part['ref'],'pin':pin['number'],'error':'LIVE_PIN_WIRE_LINK_MISMATCH'})
     return issues
+
+
+def preflight_transforms(state, operations):
+    """Predict the calibrated endpoint-only update, not an unimplemented rerouter."""
+    from .geometry import transform_xy
+    projected = copy.deepcopy(state)
+    parts = {part['ref']: part for part in projected['components']}
+    wires = {wire['address']: wire for wire in projected.get('wires', [])}
+    for op in operations:
+        if op['op'] != 'transform':
+            continue
+        part = parts.get(op['ref'])
+        if part is None:
+            # An added symbol's native instance has not been observed yet.
+            continue
+
+        def move(point):
+            local = [point[axis]-part['position_nm'][axis] for axis in (0, 1)]
+            local = transform_xy(local, -part.get('rotation', 0)*10)
+            local = transform_xy(local, 0, part.get('mirror', 0))
+            result = transform_xy(local, op['rotation']*10, op['mirror'])
+            return [result[axis]+op['position_nm'][axis] for axis in (0, 1)]
+
+        for pin in part['pins']:
+            if pin.get('wire', '0x0') != '0x0':
+                wire = wires.get(pin['wire'])
+                if not wire or 'xy' not in pin or 'points' not in wire or len(wire['points']) < 2:
+                    raise CircuitError('LIVE_TRANSFORM_GEOMETRY_UNAVAILABLE: '+op['ref'])
+                ends = [index for index, end in enumerate(wire['endpoints'])
+                        if end['owner'] == part['address'] and end.get('xy') == pin['xy']]
+                if len(ends) != 1:
+                    raise CircuitError('LIVE_TRANSFORM_ENDPOINT_AMBIGUOUS: '+op['ref'])
+                index = ends[0]
+                point = move(pin['xy'])
+                wire['endpoints'][index]['xy'] = point
+                wire['points'][0 if index == 0 else -1] = point
+            if 'xy' in pin:
+                pin['xy'] = move(pin['xy'])
+        part.update({key: op[key] for key in ('position_nm', 'rotation', 'mirror')})
+    if any(op['op'] == 'transform' for op in operations):
+        issues = geometry_issues(projected)
+        if issues:
+            raise CircuitError('LIVE_TRANSFORM_REQUIRES_REROUTE: '+json.dumps(issues, ensure_ascii=True))
+    return projected
 
 
 def property_projection(state, keys):
@@ -270,6 +316,8 @@ def prepare_operations(state, operations, library):
         result.append(op)
     if result[0]['op'] in DELETE_KINDS:
         deletion_projection(state,result)
+    else:
+        preflight_transforms(state, result)
     return result
 
 
@@ -504,7 +552,9 @@ class Live:
                       'token':state_token(after), 'state':after, 'completed':response['completed'],
                       'failure':response['failure'], 'atomic':False, 'saved':False, 'desktop_input':False,
                       'property_keys':keys, 'operations':prepared, 'pending':True,
-                      'geometry_verified':not geometry,'geometry_issues':geometry}
+                      'geometry_verified':not geometry,'geometry_issues':geometry,
+                      'geometry_scope':'observed pin/wire links, matching polyline ends and orthogonal nonzero segments',
+                      'layout_quality_verified':False, 'automatic_live_reroute':False}
             if deletion_verified is not None:
                 result['deletion_projection_verified'] = deletion_verified
                 result['deletion_survivor_identity_verified'] = deletion_identity_verified
