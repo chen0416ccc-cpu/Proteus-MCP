@@ -66,6 +66,12 @@ function simVector(c,signals) {
         wall_time_ms:Date.now(),nets:signals.map((s,i)=>({name:s.name,found:s.found,state:values[i]}))};
 }
 rpc.exports.siminputs=hwnd=>onUi(hwnd,simInventory);
+rpc.exports.simdiagnose=(hwnd,names)=>onUi(hwnd,()=>{
+    const c=simContext(),before=c.time();
+    const state=liveInspect(['EID','STATE','MODFILE','MODDLL','PRIMITIVE','PROGRAM','CLOCK']);
+    const vector=simVector(c,simResolve(names));
+    return {identity:c.identity,state,vector,simulation_time_before:before,simulation_time_after:c.time()};
+});
 rpc.exports.simactuate=(hwnd,expected,target,value)=>onUi(hwnd,()=>{
     const actions=scan().actions;
     const stop=uniqueAction(actions.filter(a=>['Stop','停止'].includes(a.text)));
@@ -96,5 +102,69 @@ rpc.exports.simtrace=(hwnd,expected,names,wallMs,intervalMs,maxSamples)=>{
             else setTimeout(step,intervalMs);
         }).catch(error=>resolve({samples,error:String(error),wall_ms_elapsed:Date.now()-started}));
         step();
+    });
+};
+
+rpc.exports.simcold=(hwnd,names,refs,events,wallMs,intervalMs,maxStartMs,tailMs)=>{
+    const started=Date.now(),samples=[],delivered=[];
+    let identity=null,signals=null,parts=null,targets=null,lastTime=-1,lastDelivery=null;
+    return new Promise(resolve=>{
+        const finish=error=>resolve({samples,dispatched:delivered,identity,error,
+            wall_ms_elapsed:Date.now()-started,first_sample_time:samples[0]?.simulation_time_before??null});
+        const step=()=>onUi(hwnd,()=>{
+            if(!activeModal().isNull())throw new Error('SIMULATION_MODAL_BLOCKED');
+            const mod=Process.findModuleByName('VSMDEBUG.DLL');
+            if(!mod||mod.base.add(0x13c6c0).readPointer().isNull())return false;
+            const c=simContext();
+            if(identity===null){
+                identity=c.identity;
+                const state=liveInspect(['EID','STATE']);
+                parts=refs.map(ref=>livePart(state,ref));
+                targets=Object.fromEntries(simInventory().inputs.map(p=>[p.ref,p]));
+                if(events.some(e=>!targets[e.ref]))throw new Error('SIMULATION_INPUT_NOT_CALIBRATED');
+                signals=simResolve(names);
+            }else simMatch(c,identity);
+            if(c.t<lastTime)throw new Error('SIMULATION_TIME_REWOUND');
+            lastTime=c.t;
+            const row=simVector(c,signals);
+            row.components=parts.map(p=>({ref:p.ref,device:p.device,
+                eid:p.properties.EID,state:liveGet(ptr(p.address),'STATE')}));
+            row.components_time_after=c.time();
+            row.native_clock_unchanged=row.native_clock_unchanged&&row.simulation_time_before===row.components_time_after;
+            row.simulation_time_after=row.components_time_after;
+            samples.push(row);
+            if(samples.length===1&&row.simulation_time_before*1000>maxStartMs)
+                throw new Error('COLD_START_WINDOW_MISSED');
+            if(samples.length>=20000)throw new Error('SIMULATION_TRACE_SAMPLE_LIMIT');
+            const event=events[delivered.length];
+            if(event){
+                const nominal=event.at_ms/1000;
+                const spacing=delivered.length?(event.at_ms-events[delivered.length-1].at_ms)/1000:0;
+                const due=lastDelivery===null?nominal:Math.max(nominal,lastDelivery+spacing);
+                if(c.time()>=due){
+                    const target=targets[event.ref],now=c.time();
+                    new NativeFunction(c.shared.readPointer().add(0x108).readPointer(),'void',
+                        ['pointer','uint','int'])(c.shared,target.eid,event.value);
+                    lastDelivery=c.time();
+                    delivered.push({...event,eid:target.eid,index:delivered.length,dispatched:true,
+                        scheduled_simulation_time:nominal,effective_due_time:due,
+                        simulation_time_before:now,simulation_time_after:lastDelivery,
+                        lateness_ms:1000*(now-nominal),persistent_state_changed:false});
+                }
+            }
+            return delivered.length===events.length&&c.time()>=lastDelivery+tailMs/1000;
+        }).then(done=>{
+            if(done)finish(null);
+            else if(Date.now()-started>=wallMs)finish('COLD_START_TIMEOUT');
+            else setTimeout(step,intervalMs);
+        }).catch(error=>finish(String(error)));
+        onUi(hwnd,()=>{
+            const state=scan();
+            if(state.modal)throw new Error('SIMULATION_MODAL_BLOCKED');
+            const run=uniqueAction(state.actions.filter(a=>['Run','运行'].includes(a.text)));
+            const stop=uniqueAction(state.actions.filter(a=>['Stop','停止'].includes(a.text)));
+            if(stop.enabled||!run.enabled)throw new Error('COLD_START_REQUIRES_STOPPED_SESSION');
+            singleShot(0,ptr(run.address),triggerSlot);
+        }).then(()=>setTimeout(step,1)).catch(error=>finish(String(error)));
     });
 };

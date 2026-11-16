@@ -1,6 +1,6 @@
 # 工具参考
 
-共 54 个工具。以下列出用途和关键参数，完整 JSON Schema 以 MCP 的 `tools/list` 返回为准。不能把“能发现命令”理解为“已验证执行该命令”。
+共 57 个工具。以下列出用途和关键参数，完整 JSON Schema 以 MCP 的 `tools/list` 返回为准。不能把“能发现命令”理解为“已验证执行该命令”。
 
 ## 版本与结果
 
@@ -122,6 +122,15 @@ PCB 坐标、宽度、间距为整数纳米，10 nm 对齐。只处理[明确支
 | `simulation_inputs` | 运行会话的 BUTTON / LOGICSTATE 清单与本 epoch 的输入 token。 |
 | `simulation_stimulate` | 当前输入 token 加 `events`，按原生仿真时间发送事件并记录迟发和原始采样。BUTTON 的 1=按下，0=释放；LOGICSTATE 的 1=高，0=低。 |
 | `simulation_observe` | 指定 `nets`、`wall_ms` 和采样间隔，读取带仿真时钟边界的数字向量，保存完整原始数据。 |
+| `simulation_audio` | 运行中的自有 `session`，只读该进程 Windows 播放会话电平、静音和音量；可选 `nets` 与同墙钟数字采样关联。`wall_ms=100..25000`（默认 2000），`interval_ms=20..1000`（默认 50）。不录音、不访问麦克风、不调音量。 |
+| `simulation_diagnose` | 运行中的自有 `session` 加 1..16 个 `refs`，联合实际引脚/导线/同名标签、DSIM 数字网络和器件内部 `STATE`。返回时钟边界及工程/固件磁盘哈希；连接预检变化则拒绝，不猜模拟电流或未命名网络。 |
+| `simulation_cold_start` | 已停止的自有 `session` 加 `events`、`nets`，在同一原生连接中启动、采首帧、派发按键并正常停止。可选 `refs`、`audio`、`timeout_ms`、`interval_ms`、`max_start_ms`、`tail_ms`。运行中/暂停中拒绝，不擅自重启。 |
 | `simulation_decode_display` | `trace_path`、`expected_sha256`、有序段线/位选线和极性，输出完整复合帧、确认次数与拒绝样本。 |
 
 网络名称必须来自实际原生电路。采样、事件分派和数码管数字解码不代表完整波形、模拟电流、音频、光学或真实硬件验收。
+
+`simulation_cold_start.events` 为 1..32 项 `{ref,value,at_ms}`，BUTTON 的 1=按下、0=释放。`at_ms=0..20000` 从**仿真零时刻**计算，与 `simulation_stimulate` 从当前时刻计算不同；必须非递减。迟发后保留相邻事件间隔，不压缩按键脉宽，也不承诺硬实时。`timeout_ms=100..30000`（默认 15000）是墙钟上限；`interval_ms=1..1000`（默认 10）；`max_start_ms=1..5000`（默认 500）是可接受首帧仿真时间；`tail_ms=100..5000`（默认 800）是最后事件后的仿真观察尾段。
+
+首帧过晚返回 `COLD_START_WINDOW_MISSED`，不把后续数据充作冷启动覆盖。`sampled` 仅表示采样流程、事件派发、身份/磁盘文件复核与停止清理完成，不代表设计正确。失败保留 `partial` / `unconfirmed`、原始样本、已派发事件和 `cleanup`；身份冲突或弹窗可能阻止停止，不强杀、不关闭文档，不自动重试。完整证据位于 `evidence_path`。
+
+音频结果区分 `no_session`、`silent`、`muted_or_zero_volume`、`output_detected`、`partial` / `unavailable`。`output_detected` 是进程播放电平，不证明人耳可听、当前蜂鸣器因果或扬声器硬件正常。关联数字样本使用最近的前一帧，保留 `digital_age_ms`。工程/固件哈希描述磁盘文件，不是 MCU 已加载镜像回读。内部 `STATE` 也不是画面光学证据：若屏幕灯态不同，先暂停并重绘核对，不直接改接线或固件。

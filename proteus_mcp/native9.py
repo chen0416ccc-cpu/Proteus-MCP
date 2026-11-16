@@ -476,18 +476,19 @@ class Builder:
 
     def component(self, ref, device, origin_grid, value=None, properties=None, identity=None,
                   rotation=0, mirror=0, native_definition=None):
-        from .devices import selected_definition, native_order
+        from .devices import selected_definition, native_order, instance_profile
         from .geometry import orientation
         if device not in self.templates:
             spec = selected_definition({'device':device,'native_definition':native_definition or {}})
             if spec['elements'] != 1 or spec['units'] != 1:
                 raise CircuitError('Multi-unit devices need an explicit unit mapping: '+device)
             template = copy.deepcopy(self.templates['RES'])
-            animated = bool(spec['animation_frames'])
-            template.update(device=device,kind=8 if animated else spec['kind'],pin_count=len(spec['pins']),
+            kind, pin_header = instance_profile(spec)
+            template.update(device=device,kind=kind,pin_count=len(spec['pins']),
                             pointers=[0]*len(spec['pins']),
-                            pin_header='000000001000000000' if animated else '00'*9)
+                            pin_header=pin_header)
             template['labels'][1]['text'] = spec['defaults'].get('VALUE',device)
+            template['labels'][2]['text'] = device
             template['labels'][3]['text'] = spec['properties']
             self.templates[device] = template
         if ref in self.parts:

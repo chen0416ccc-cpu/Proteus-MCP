@@ -17,6 +17,24 @@ ANIMATED_PROFILES = {
     '7SEG-MPX4-CA': (17, 'f18e4fce44b1618cccf721dae5c816578a5be91813bfa228884204005df6c692'),
 }
 
+# Static-looking library symbols can still require a native active instance.
+ACTIVE_INSTANCE_PROFILES = {
+    'BUZZER': ('0c59ac064d2f2058e3763aefb57fa72feb61391bad381c458045ec3fb5827434',
+               'SPEAKER,0,DLL', 8, '00'*9),
+}
+
+
+def instance_profile(spec):
+    if spec['animation_frames']:
+        return 8, '000000001000000000'
+    active = spec.get('active_model')
+    if active:
+        profile = ACTIVE_INSTANCE_PROFILES.get(spec['device'])
+        if not profile or profile[:2] != (spec.get('definition_sha256'), active):
+            raise CircuitError('ACTIVE_INSTANCE_NOT_CALIBRATED: '+spec['device'])
+        return profile[2:]
+    return spec['kind'], '00'*9
+
 
 def animation_frames(blob, begin, end):
     frames, names = [], set()
@@ -172,7 +190,7 @@ def parse_device(blob, name, allow_unresolved_pins=False):
     values = dict(re.findall(r'^\{?([A-Z0-9_]+)=([^\r\n}]+)\}?$', defaults, re.M))
     meta = dict(re.findall(r'^\{?([A-Z0-9_]+)=([^\r\n}]+)\}?$', sections.get('DEVICE',''), re.M))
     return {'device':name, 'kind':kind, 'elements':elements, 'units':units,
-            'animation_frames':frames,
+            'animation_frames':frames, 'active_model':meta.get('ACTIVE'),
             'pins':pins, 'properties':defaults, 'defaults':values,
             'unresolved_pin_glyphs':sorted({p['symbol'] for p in pins if p['geometry_source']=='requires_native_instance'}),
             'prefix':meta.get('PREFIX','U'), 'raw_properties':text,

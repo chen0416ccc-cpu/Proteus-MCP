@@ -51,6 +51,22 @@ python scripts/verify_native.py --workspace D:\ProteusAcceptance --case all
 
 私有回归包含分支删除/撤销、同构多单元、原生 ERC、双层铜线/通孔/有界推挤、原生 DRC/预生产检查、BUTTON/LOGICSTATE、计数回绕和中断嵌套等独立项目。公开脚本的通过结果不包含这些项目，也不是整个 Proteus API 的覆盖率声明。
 
+## 活动模型与联合观测
+
+可移植测试 `test_active_instances` / `test_observations` 覆盖活动记录、隐藏名称、未知定义拒绝、物理连接归并、未知模拟信号、音频线程释放、错误留证、冷启动窗口与清理及身份冲突。音频单元测试使用替身，不代表本机播放已经成功。
+
+显式运行隔离原生验收：
+
+```powershell
+python scripts/verify_observations.py --run-native --workspace D:\ProteusAcceptance\Joint --fixture D:\Fixtures\Interrupt.pdsprj
+```
+
+`--fixture` 只读取本机保存的单页外部中断电路，要求包含 U1、BZ1、D1..D8、SW1/SW2 及对应命名网络。脚本在新副本中使用生产 Builder 重建 BZ1 的活动记录，换入专用 C51 测试固件，核对源文件哈希、接线及几何不变；不修改原件。它验证首半秒采样、按键分派、计数/报警网络变化、播放电平、引脚/内部状态联合回读和正常停止/关闭。无需屏幕、截图、鼠标或键盘。
+
+默认直接调用 Service 并校验生产 schema；使用已安装 wheel 的 Python 并加 `--installed-server` 后，工具通过隔离 stdio 服务执行，同时核对安装包与 checkout 的生产源码、服务前后指纹、stderr 及退出码。报告为工作区 `observations-acceptance.json`，原始样本在其中记录的 `evidence_path`。两种模式不能混称。
+
+省略 `--fixture` 时尝试全新导出外部中断示例。当前已知该布局可能触发 `LABEL_SPACE_EXHAUSTED`，此路径未通过；不会放宽布局检查或静默回退。已有 fixture 上联合观测通过，不表示自动布局问题已修复，也不证明未经测试的活动器件可用。进程播放电平不等同人耳试听，内部灯态不等同画面光学验收。
+
 ## 分发检查
 
 ```powershell
@@ -59,7 +75,7 @@ python -m build
 python scripts/check_release.py --artifacts dist
 ```
 
-审计 Git 跟踪文件和 wheel/sdist 成员：拒绝私有目录、原生工程、厂商二进制、常见凭据、私人路径和意外成员；检查文档链接、54 个工具和桥资源；比较包内源码与当前 checkout。它是补充门槛，不是完整秘密扫描器或第三方许可证法律审查。
+审计 Git 跟踪文件和 wheel/sdist 成员：拒绝私有目录、原生工程、厂商二进制、常见凭据、私人路径和意外成员；检查文档链接、57 个工具和桥资源；比较包内源码与当前 checkout。新增文件须纳入审计索引；只审计旧的跟踪文件不能证明新文件已检查。它是补充门槛，不是完整秘密扫描器或第三方许可证法律审查。
 
 在新虚拟环境安装 wheel 后执行：
 

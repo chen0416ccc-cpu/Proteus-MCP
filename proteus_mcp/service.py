@@ -38,6 +38,8 @@ class Service:
         self.checks = NativeChecks(self.bridge,self.library)
         from .simulation import Simulation
         self.simulation = Simulation(self.bridge)
+        from .observations import Observations
+        self.observations = Observations(self.bridge)
 
     def doctor(self):
         from .capabilities import functional_coverage,source_fingerprint,acceptance_evidence
@@ -73,6 +75,12 @@ class Service:
         extended['native_simulation_inputs'].update(tools=['simulation_inputs','simulation_stimulate','simulation_observe','simulation_decode_display','example_external_interrupt'],
             devices=['BUTTON','LOGICSTATE'],runtime_events_only=True,native_simulator_time=True,
             desktop_input=False,analog_current=False,complete_waveform_capture=False)
+        extended['joint_simulation_evidence'] = {
+            'available':extended['native_simulation_inputs']['available'],
+            'tools':['simulation_audio','simulation_diagnose','simulation_cold_start'],
+            'audio_meter_platform_available':os.name == 'nt', 'recording':False,
+            'volume_changes':False, 'optical_verification':False, 'analog_current':False,
+            'cold_start_requires_stopped':True, 'native_runtime_verified':False}
         extended['native_live_edit'].update(multi_unit='homogeneous_explicit_REF_colon_unit',
                                            unresolved_pin_geometry='native_instance_coordinates_not_static_guesses')
         extended['native_pcb_routing'].update(layers=['TOP','BOT'],routing='layer_state_Astar_or_explicit_path',
@@ -185,6 +193,12 @@ class Service:
             return s.create(**arguments)
         if name == 'simulation_inputs':
             return self.simulation.inputs(**arguments)
+        if name == 'simulation_audio':
+            return self.observations.audio(**arguments)
+        if name == 'simulation_diagnose':
+            return self.observations.diagnose(**arguments)
+        if name == 'simulation_cold_start':
+            return self.observations.cold_start(**arguments)
         if name == 'simulation_stimulate':
             return self.simulation.stimulate(**arguments)
         if name == 'simulation_observe':

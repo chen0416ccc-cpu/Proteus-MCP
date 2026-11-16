@@ -38,14 +38,15 @@ def main():
         assert all('result' in reply for reply in replies)
         assert replies[0]['result']['protocolVersion'] == '2025-06-18'
         tools = replies[1]['result']['tools']
-        assert len(tools) == 54 and len({t['name'] for t in tools}) == 54
+        assert len(tools) == 57 and len({t['name'] for t in tools}) == 57
+        assert {'simulation_audio','simulation_diagnose','simulation_cold_start'} <= {t['name'] for t in tools}
         doctor = json.loads(replies[2]['result']['content'][0]['text'])
         assert not replies[2]['result']['isError']
         assert doctor['capabilities']['semantic_circuit']['available']
         assert not doctor['capabilities']['native_file_generation']['available']
         assert not doctor['capabilities']['native_simulation_control']['available']
         assert not doctor['capabilities']['keil_build']['available']
-    print(json.dumps({'status': 'passed', 'tools': 54, 'isolated_installed_package': True,
+    print(json.dumps({'status': 'passed', 'tools': 57, 'isolated_installed_package': True,
                       'missing_native_dependencies_reported': True, 'native_processes_started': False}))
     return 0
 
